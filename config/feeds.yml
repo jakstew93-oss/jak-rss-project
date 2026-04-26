@@ -1,0 +1,35 @@
+feed:
+  title: "Jak's News Radar"
+  description: "A personalized RSS feed assembled from public news feeds."
+  link: "https://example.com/jak-news-radar"
+  language: "en-gb"
+  max_items: 50
+
+filters:
+  # Leave include_keywords empty to collect everything from the sources.
+  # Matching checks each story's title, summary, source name, tags, and URL.
+  include_keywords:
+    - ai
+    - artificial intelligence
+    - climate
+    - cybersecurity
+    - security
+    - technology
+    - uk
+  exclude_keywords:
+    - crossword
+    - quiz
+    - sport
+    - football
+
+sources:
+  - name: "BBC News"
+    url: "https://feeds.bbci.co.uk/news/rss.xml"
+  - name: "BBC Technology"
+    url: "https://feeds.bbci.co.uk/news/technology/rss.xml"
+  - name: "The Guardian World"
+    url: "https://www.theguardian.com/world/rss"
+  - name: "The Guardian Technology"
+    url: "https://www.theguardian.com/technology/rss"
+  - name: "NPR News"
+    url: "https://feeds.npr.org/1001/rss.xml"
