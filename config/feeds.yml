@@ -1,7 +1,7 @@
 feed:
   title: "Jak's News Radar"
   description: "A personalized RSS feed assembled from public news feeds."
-  link: "https://example.com/jak-news-radar"
+  link: "https://jakstew93-oss.github.io/jak-rss-project/"
   language: "en-gb"
   max_items: 50
 
