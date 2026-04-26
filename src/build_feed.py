@@ -44,6 +44,7 @@ class Story:
     source: str
     published: datetime
     guid: str
+    image_url: str | None
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -109,6 +110,31 @@ def clean_summary(value: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def extract_image_url(entry: Any) -> str | None:
+    candidates: list[tuple[int, str]] = []
+
+    for image in entry.get("media_content", []):
+        url = image.get("url", "").strip()
+        if url:
+            candidates.append((int(image.get("width") or 0), url))
+
+    for image in entry.get("media_thumbnail", []):
+        url = image.get("url", "").strip()
+        if url:
+            candidates.append((int(image.get("width") or 0), url))
+
+    for link in entry.get("links", []):
+        href = link.get("href", "").strip()
+        media_type = link.get("type", "")
+        if href and media_type.startswith("image/"):
+            candidates.append((0, href))
+
+    if not candidates:
+        return None
+
+    return sorted(candidates, key=lambda candidate: candidate[0], reverse=True)[0][1]
+
+
 def collect_stories(config: dict[str, Any]) -> list[Story]:
     include = normalized_terms(config.get("filters", {}).get("include_keywords"))
     exclude = normalized_terms(config.get("filters", {}).get("exclude_keywords"))
@@ -137,6 +163,7 @@ def collect_stories(config: dict[str, Any]) -> list[Story]:
                     source=source_name,
                     published=parse_date(entry),
                     guid=story_guid(entry, link, source_name),
+                    image_url=extract_image_url(entry),
                 )
             )
 
@@ -189,6 +216,8 @@ def build_rss(config: dict[str, Any], stories: list[Story]) -> ET.ElementTree:
         add_text(item, "pubDate", format_datetime(story.published))
         add_text(item, "source", story.source)
         add_text(item, "description", f"{story.summary}\n\nSource: {story.source}".strip())
+        if story.image_url:
+            ET.SubElement(item, "enclosure", {"url": story.image_url, "type": "image/jpeg"})
 
     ET.indent(rss, space="  ")
     return ET.ElementTree(rss)
@@ -226,14 +255,21 @@ def render_index(config: dict[str, Any], stories: list[Story], public_dir: Path)
     )
     items = "\n".join(
         f"""
-        <article class="story" data-source="{html.escape(story.source)}">
-          <div class="story-meta">
-            <span>{html.escape(story.source)}</span>
-            <time datetime="{story.published.isoformat()}">{display_date(story.published)}</time>
+        <article class="story {story_image_class(story)}" data-source="{html.escape(story.source)}">
+          {render_story_image(story)}
+          <div class="story-body">
+            <div class="story-meta">
+              <span>{html.escape(story.source)}</span>
+              <time datetime="{story.published.isoformat()}">{display_date(story.published)}</time>
+            </div>
+            <h2><a href="{html.escape(story.link)}" target="_blank" rel="noopener noreferrer">{html.escape(story.title)}</a></h2>
+            <p>{html.escape(short_summary(story.summary))}</p>
+            <details>
+              <summary>Preview</summary>
+              <p>{html.escape(story.summary)}</p>
+            </details>
+            <a class="read-link" href="{html.escape(story.link)}" target="_blank" rel="noopener noreferrer">Read at source</a>
           </div>
-          <h2><a href="{html.escape(story.link)}" target="_blank" rel="noopener noreferrer">{html.escape(story.title)}</a></h2>
-          <p>{html.escape(short_summary(story.summary))}</p>
-          <a class="read-link" href="{html.escape(story.link)}" target="_blank" rel="noopener noreferrer">Read story</a>
         </article>
         """.strip()
         for story in visible_stories
@@ -318,6 +354,19 @@ def render_index(config: dict[str, Any], stories: list[Story], public_dir: Path)
 </html>
 """
     public_dir.joinpath("index.html").write_text(index, encoding="utf-8")
+
+
+def render_story_image(story: Story) -> str:
+    if not story.image_url:
+        return ""
+    return (
+        f'<a class="story-image" href="{html.escape(story.link)}" target="_blank" rel="noopener noreferrer">'
+        f'<img src="{html.escape(story.image_url)}" alt="" loading="lazy"></a>'
+    )
+
+
+def story_image_class(story: Story) -> str:
+    return "" if story.image_url else "story-no-image"
 
 
 def render_styles(public_dir: Path) -> None:
@@ -472,10 +521,43 @@ main {
 }
 
 .story {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 18px;
+  padding: 12px;
   background: var(--surface);
+}
+
+.story-image {
+  display: block;
+  align-self: stretch;
+  min-height: 150px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #e7edf3;
+}
+
+.story-image img {
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
+  object-fit: cover;
+  display: block;
+}
+
+.story-no-image {
+  display: block;
+}
+
+.story-body {
+  min-width: 0;
+  padding: 6px 6px 6px 0;
+}
+
+.story > .story-body:first-child {
+  grid-column: 1 / -1;
 }
 
 .story-meta {
@@ -508,6 +590,21 @@ main {
   color: var(--muted);
 }
 
+details {
+  margin: 0 0 10px;
+}
+
+summary {
+  width: max-content;
+  cursor: pointer;
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+details p {
+  margin-top: 8px;
+}
+
 .read-link {
   color: var(--accent-dark);
 }
@@ -533,6 +630,19 @@ main {
 
   .stats {
     margin-top: 12px;
+  }
+
+  .story {
+    display: block;
+  }
+
+  .story-image {
+    margin-bottom: 12px;
+    aspect-ratio: 16 / 9;
+  }
+
+  .story-body {
+    padding: 0;
   }
 }
 """,
@@ -566,13 +676,23 @@ def render_xsl(public_dir: Path) -> None:
           <section class="story-list">
             <xsl:for-each select="item">
               <article class="story">
-                <div class="story-meta">
-                  <span><xsl:value-of select="source"/></span>
-                  <time><xsl:value-of select="pubDate"/></time>
+                <xsl:if test="enclosure[starts-with(@type, 'image/')]">
+                  <a class="story-image" target="_blank" rel="noopener noreferrer">
+                    <xsl:attribute name="href"><xsl:value-of select="link"/></xsl:attribute>
+                    <img alt="" loading="lazy">
+                      <xsl:attribute name="src"><xsl:value-of select="enclosure[starts-with(@type, 'image/')][1]/@url"/></xsl:attribute>
+                    </img>
+                  </a>
+                </xsl:if>
+                <div class="story-body">
+                  <div class="story-meta">
+                    <span><xsl:value-of select="source"/></span>
+                    <time><xsl:value-of select="pubDate"/></time>
+                  </div>
+                  <h2><a target="_blank" rel="noopener noreferrer"><xsl:attribute name="href"><xsl:value-of select="link"/></xsl:attribute><xsl:value-of select="title"/></a></h2>
+                  <p><xsl:value-of select="description"/></p>
+                  <a class="read-link" target="_blank" rel="noopener noreferrer"><xsl:attribute name="href"><xsl:value-of select="link"/></xsl:attribute>Read at source</a>
                 </div>
-                <h2><a target="_blank" rel="noopener noreferrer"><xsl:attribute name="href"><xsl:value-of select="link"/></xsl:attribute><xsl:value-of select="title"/></a></h2>
-                <p><xsl:value-of select="description"/></p>
-                <a class="read-link" target="_blank" rel="noopener noreferrer"><xsl:attribute name="href"><xsl:value-of select="link"/></xsl:attribute>Read story</a>
               </article>
             </xsl:for-each>
           </section>
