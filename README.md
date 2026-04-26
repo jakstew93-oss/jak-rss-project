@@ -1,6 +1,6 @@
 # Jak RSS Project
 
-Build your own RSS feed for finding news. This project reads public RSS feeds, filters stories by keywords, removes duplicates, and writes a personalized RSS feed to `public/feed.xml`.
+Build your own RSS feed for finding news. This project reads public RSS feeds, filters stories by keywords, removes duplicates, writes a personalized RSS feed to `public/feed.xml`, and generates a readable news page at `public/index.html`.
 
 ## Quick Start
 
@@ -11,13 +11,19 @@ pip install -r requirements.txt
 python src/build_feed.py
 ```
 
-Open `public/feed.xml` in an RSS reader, or serve the folder locally:
+Open `public/index.html` in your browser for the readable page, or serve the folder locally:
 
 ```bash
 python3 -m http.server 8000 --directory public
 ```
 
-Your local feed URL will be:
+Your local readable page will be:
+
+```text
+http://localhost:8000/
+```
+
+Your local RSS feed URL will be:
 
 ```text
 http://localhost:8000/feed.xml
@@ -42,6 +48,12 @@ Once GitHub Pages is enabled, your feed URL will look like:
 
 ```text
 https://jakstew93-oss.github.io/jak-rss-project/feed.xml
+```
+
+The readable page will be:
+
+```text
+https://jakstew93-oss.github.io/jak-rss-project/
 ```
 
 You can paste that URL into an RSS reader on your iPhone.
